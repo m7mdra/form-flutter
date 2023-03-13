@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:device_preview/device_preview.dart';
+import 'package:faker/faker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
@@ -11,7 +13,7 @@ void main() {
     builder: (BuildContext context) {
       return const MyApp();
     },
-    enabled: true,
+    enabled: false,
   ));
 }
 
@@ -42,37 +44,54 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
-    list.add(TitleQuestion(id: '2', title: 'Section title'));
-    list.add(InputQuestion(
-        id: '1',
-        hint: 'Please write you answer here.',
-        title:
-            'Breaking: Changed resourcePrefix to maplibre_ from mapbox_ 647 and renamed resources accordingly. Note that this is a breaking change since the names of public resources were renamed as well. Replaced Mapbox logo with MapLibre logo.'));
-
-    list.add(ImageQuestion(
-        id: '2',
-        value: [],
-        title:
-            'GMS location: Replace new LocationRequest() with LocationRequest.Builder, and LocationRequest.PRIORITY_X with Priority.PRIORITY_X'));
-    list.add(VideoQuestion(
-        id: '3',
-        title:
-            'Increment minSdkVersion from 14 to 21, as it covers 99.2%% of the newer devices since 2014'));
-    list.add(SingleSelectionQuestion(
-        ['Option1', 'Option2', 'Option3', 'Option4'],
-        id: '5', title: 'Catches NaN for onMove event (621)'));
-    list.add(MultiSelectionQuestion(
-        ['Option1', 'Option2', 'Option3', 'Option4'],
-        value: [],
-        id: '4',
-        title: 'and lessens the backward compatibility burden (630)'));
+    var faker = Faker();
+    list.addAll(List.generate(10, (index) {
+      return InputQuestion(
+          id: faker.guid.guid(),
+          hint: faker.lorem.sentences(1).join(' '),
+          title: faker.lorem.sentences(3).join(' '));
+    }));
+    list.addAll(List.generate(10, (index) {
+      return VideoQuestion(
+          id: faker.guid.guid(), title: faker.lorem.sentences(3).join(' '));
+    }));
+    list.addAll(List.generate(10, (index) {
+      return ImageQuestion(
+          id: faker.guid.guid(),
+          value: [],
+          title: faker.lorem.sentences(3).join(' '));
+    }));
+    list.addAll(List.generate(10, (index) {
+      return SingleSelectionQuestion(
+          List.generate(4, (index) => faker.animal.name()).toList(),
+          id: faker.guid.guid(),
+          title: faker.lorem.sentences(3).join(' '));
+    }));
+    list.addAll(List.generate(10, (index) {
+      return MultiSelectionQuestion(
+          List.generate(4, (index) => faker.animal.name()).toList(),
+          value: [],
+          id: faker.guid.guid(),
+          title: faker.lorem.sentences(3).join(' '));
+    }));
+    list.shuffle();
+    list.shuffle();
+    list.shuffle();
+    list.shuffle();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          list.map((e) => jsonEncode(e.toMap())).forEach((element) {
+            print(element);
+          });
+        },
+        child: const Icon(Icons.bug_report_outlined),
+      ),
       body: SafeArea(
         child: ListView.separated(
           padding: const EdgeInsetsDirectional.symmetric(horizontal: 16),
@@ -125,6 +144,7 @@ class SingleSelectionQuestionWidget extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: question.items
                     .map((e) => RadioListTile(
+                          dense: true,
                           title: Text(e),
                           value: e,
                           groupValue: value,
@@ -159,6 +179,7 @@ class MultipleSelectionQuestionWidget extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: question.items
                     .map((e) => CheckboxListTile(
+                          dense: true,
                           title: Text(e),
                           value: value?.contains(e) == true,
                           onChanged: (newValue) {
@@ -237,7 +258,7 @@ class VideoQuestionWidget extends StatelessWidget {
                   },
                 ),
               OutlinedButton.icon(
-                  icon: const Icon(Icons.photo),
+                  icon: const Icon(Icons.video_collection),
                   onPressed: () async {
                     var result = await showModalBottomSheet<XFile>(
                         context: context,
@@ -275,8 +296,9 @@ class ImageQuestionWidget extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               QuestionTitleWidget(question: question),
-              SizedBox(
+              AnimatedContainer(
                 height: value.isNotEmpty ? 210 : 10.0,
+                duration: const Duration(milliseconds: 300),
                 child: GridView.builder(
                   itemBuilder: (context, index) {
                     var image = value[index];
@@ -406,7 +428,6 @@ enum QuestionType {
 abstract class Question<T> extends ValueNotifier<T> {
   final String id;
   final String title;
-
   final QuestionType type;
 
   Question(
@@ -433,8 +454,35 @@ abstract class Question<T> extends ValueNotifier<T> {
     return {
       'id': id,
       'title': title,
-      'type': type,
+      'type': type.index,
+      'value': _genericToMap(value),
     };
+  }
+
+  dynamic _genericToMap(dynamic val) {
+    if (null == val) {
+      return null;
+    } else if (val is num) {
+      return val;
+    } else if (val is String) {
+      return val;
+    } else if (val is bool) {
+      return val;
+    } else if (val is DateTime) {
+      return val.toString();
+    } else if (val is List) {
+      return val.map(_genericToMap).toList();
+    } else if (val is Map) {
+      return val.map(
+          (key, value) => MapEntry(_genericToMap(key), _genericToMap(value)));
+    } else if (val is Set) {
+      return val.map(_genericToMap).toSet();
+    }
+    try {
+      return val?.toMap();
+    } catch (e) {
+      return val?.index;
+    }
   }
 }
 
